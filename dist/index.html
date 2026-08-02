@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexus Finance PRO 360° | Gestão Patrimonial</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
+  <script type="module" crossorigin src="/assets/index-1f3eVw1u.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-BJW_jKD6.css">
+</head>
+<body class="dark-theme">
+    <div class="bg-glow glow-1"></div>
+    <div class="bg-glow glow-2"></div>
+    <div class="bg-glow glow-3"></div>
+
+    <div class="app-container">
+        <header class="navbar glass">
+            <div class="logo-section">
+                <div class="logo-icon"><i data-lucide="compass"></i></div>
+                <div class="logo-text">
+                    <h1>Nexus<span>Finance</span> <span class="badge-pro">PRO 360°</span></h1>
+                </div>
+            </div>
+
+            <nav class="nav-tabs">
+                <button class="tab-btn active" data-tab="dashboard"><i data-lucide="layout-dashboard"></i> Dashboard</button>
+                <button class="tab-btn" data-tab="despesas"><i data-lucide="shopping-cart"></i> Despesas</button>
+                <button class="tab-btn" data-tab="receitas"><i data-lucide="trending-up"></i> Receitas</button>
+                <button class="tab-btn" data-tab="previsibilidade"><i data-lucide="calendar-clock"></i> Previsibilidade</button>
+            </nav>
+
+            <div class="nav-actions">
+                <div class="month-selector">
+                    <i data-lucide="calendar"></i>
+                    <select id="global-month-select"></select>
+                </div>
+                <button id="btn-demo-data" class="btn btn-primary btn-sm"><i data-lucide="zap"></i> Demo</button>
+                <div class="dropdown">
+                    <button class="btn btn-outline btn-sm dropdown-toggle"><i data-lucide="settings"></i></button>
+                    <div class="dropdown-menu">
+                        <a href="#" id="import-csv"><i data-lucide="file-up"></i> Importar CSV</a>
+                        <a href="#" id="export-json"><i data-lucide="download"></i> Backup (JSON)</a>
+                        <a href="#" id="import-json"><i data-lucide="upload"></i> Restaurar (JSON)</a>
+                        <a href="#" id="export-csv"><i data-lucide="file-down"></i> Relatório CSV</a>
+                        <div class="divider"></div>
+                        <a href="#" id="reset-data" class="text-danger"><i data-lucide="trash"></i> Limpar Dados</a>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <input type="file" id="file-import-input" accept=".json" style="display:none;" />
+        <input type="file" id="file-import-csv" accept=".csv" style="display:none;" />
+
+        <main class="main-content">
+            <!-- DASHBOARD -->
+            <section id="tab-dashboard" class="tab-pane active">
+                <div class="section-header">
+                    <div>
+                        <h2>Painel Executivo</h2>
+                        <p class="subtitle">Visão 360° do seu patrimônio e fluxo de caixa.</p>
+                    </div>
+                </div>
+
+                <div class="kpi-grid">
+                    <div class="kpi-card glass">
+                        <div class="kpi-icon emerald"><i data-lucide="trending-up"></i></div>
+                        <div class="kpi-details">
+                            <span class="kpi-label">Receitas do Mês</span>
+                            <div class="kpi-value emerald-text" id="kpi-ganhos">R$ 0,00</div>
+                            <span class="kpi-trend" id="kpi-ganhos-sub">---</span>
+                        </div>
+                    </div>
+                    <div class="kpi-card glass">
+                        <div class="kpi-icon rose"><i data-lucide="shopping-bag"></i></div>
+                        <div class="kpi-details">
+                            <span class="kpi-label">Saídas e Faturas</span>
+                            <div class="kpi-value rose-text" id="kpi-gastos">R$ 0,00</div>
+                            <span class="kpi-trend" id="kpi-gastos-sub">---</span>
+                        </div>
+                    </div>
+                    <div class="kpi-card glass">
+                        <div class="kpi-icon cyan"><i data-lucide="wallet"></i></div>
+                        <div class="kpi-details">
+                            <span class="kpi-label">Saldo Disponível</span>
+                            <div class="kpi-value cyan-text" id="kpi-contas-saldo">R$ 0,00</div>
+                            <span class="kpi-trend" id="total-contas-saldo-top">---</span>
+                        </div>
+                    </div>
+                    <div class="kpi-card glass">
+                        <div class="kpi-icon violet"><i data-lucide="pie-chart"></i></div>
+                        <div class="kpi-details">
+                            <span class="kpi-label">Patrimônio Investido</span>
+                            <div class="kpi-value violet-text" id="kpi-patrimonio">R$ 0,00</div>
+                            <span class="kpi-trend emerald-text" id="kpi-rendimento-est">---</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="charts-grid mb-4">
+                    <div class="chart-card glass col-span-2">
+                        <div class="chart-header">
+                            <h4>Balanço Mensal</h4>
+                            <span class="chart-subtitle">Entradas x Saídas</span>
+                        </div>
+                        <div class="chart-container"><canvas id="chartBalanco"></canvas></div>
+                    </div>
+                    <div class="chart-card glass">
+                        <div class="chart-header">
+                            <h4>Gastos por Categoria</h4>
+                        </div>
+                        <div class="chart-container doughnut-container"><canvas id="chartCategorias"></canvas></div>
+                    </div>
+                </div>
+
+                <div class="widget-estrutural glass">
+                    <div class="chart-header">
+                        <h4>Estrutura de Custos</h4>
+                        <span class="chart-subtitle">Custos Fixos vs Variáveis no Mês</span>
+                    </div>
+                    <div class="grid-2-cols">
+                        <div>
+                            <div class="flex justify-between mb-2">
+                                <span>Custos Fixos (<span id="pct-fixo-txt">0%</span>)</span>
+                                <strong id="val-fixo-txt">R$ 0,00</strong>
+                            </div>
+                            <div class="progress-bar-bg"><div id="bar-fixo" class="progress-bar-fill bg-violet" style="width:0%"></div></div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between mb-2">
+                                <span>Custos Variáveis (<span id="pct-var-txt">0%</span>)</span>
+                                <strong id="val-var-txt">R$ 0,00</strong>
+                            </div>
+                            <div class="progress-bar-bg"><div id="bar-variavel" class="progress-bar-fill bg-amber" style="width:0%"></div></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="cards-section-header mt-4">
+                    <h3>Contas & Carteiras</h3>
+                    <button class="btn btn-sm btn-outline" onclick="app.openModal('modal-conta')"><i data-lucide="plus"></i> Nova Conta</button>
+                </div>
+                <div id="contas-container" class="contas-grid"></div>
+
+                <div class="cards-section-header mt-4">
+                    <h3>Cartões de Crédito</h3>
+                    <button class="btn btn-sm btn-outline" onclick="app.openModal('modal-cartao')"><i data-lucide="plus"></i> Novo Cartão</button>
+                </div>
+                <div id="cards-container" class="credit-cards-grid"></div>
+
+                <div class="charts-grid mb-4">
+                    <div class="chart-card glass col-span-2">
+                        <div class="chart-header">
+                            <h4>Projeção de Faturas</h4>
+                            <span class="chart-subtitle">Próximos 12 meses</span>
+                        </div>
+                        <div class="chart-container"><canvas id="chartFaturas"></canvas></div>
+                    </div>
+                    <div class="chart-card glass">
+                        <div class="chart-header">
+                            <h4>Patrimônio Futuro</h4>
+                            <span class="chart-subtitle">Crescimento projetado</span>
+                        </div>
+                        <div class="chart-container"><canvas id="chartInvestimentos"></canvas></div>
+                    </div>
+                </div>
+
+                <div class="table-section glass">
+                    <div class="table-toolbar">
+                        <h4>Meus Investimentos</h4>
+                        <button class="btn btn-sm btn-primary" onclick="app.openModal('modal-investimento')">Novo Ativo</button>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Data</th>
+                                    <th>Ativo</th>
+                                    <th>Tipo</th>
+                                    <th style="text-align:right">Taxa Média (a.m.)</th>
+                                    <th style="text-align:right">Valor Aplicado</th>
+                                    <th style="text-align:right">Rend. Mensal Est.</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-investimentos"></tbody>
+                            <tfoot>
+                                <tr class="table-footer-row">
+                                    <td colspan="4" style="text-align:right; font-weight:700">Total</td>
+                                    <td id="tfoot-total-investido" style="text-align:right; font-weight:700"></td>
+                                    <td id="tfoot-total-rendimento" style="text-align:right; font-weight:700" class="emerald-text"></td>
+                                    <td id="count-investimentos" style="text-align:center"></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="table-section glass">
+                    <div class="table-toolbar">
+                        <h4>Gestão de Benefícios (VA / VR)</h4>
+                        <button class="btn btn-sm btn-primary" onclick="app.openModal('modal-vavr')">Registrar Gasto</button>
+                    </div>
+                    
+                    <div class="benefit-stats my-4">
+                        <div class="benefit-card glass">
+                            <div class="benefit-header">
+                                <div class="benefit-icon bg-cyan-glow"><i data-lucide="shopping-cart"></i></div>
+                                <div>
+                                    <h3>Vale Alimentação (VA)</h3>
+                                </div>
+                            </div>
+                            <div class="benefit-stats my-4">
+                                <div class="stat-box"><span class="stat-label">Carga</span><strong id="va-carga">R$ 0,00</strong></div>
+                                <div class="stat-box"><span class="stat-label">Gastos</span><strong id="va-gasto" class="rose-text">R$ 0,00</strong></div>
+                                <div class="stat-box"><span class="stat-label">Saldo</span><strong id="va-saldo" class="amber-text">R$ 0,00</strong></div>
+                            </div>
+                            <div class="progress-container">
+                                <div class="progress-bar-bg"><div id="va-progress" class="progress-bar-fill bg-cyan" style="width:0%"></div></div>
+                                <div class="progress-labels">
+                                    <span id="va-pct">0%</span>
+                                    <span id="va-rec-diario"></span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="benefit-card glass">
+                            <div class="benefit-header">
+                                <div class="benefit-icon bg-amber-glow"><i data-lucide="utensils"></i></div>
+                                <div>
+                                    <h3>Vale Refeição (VR)</h3>
+                                </div>
+                            </div>
+                            <div class="benefit-stats my-4">
+                                <div class="stat-box"><span class="stat-label">Carga</span><strong id="vr-carga">R$ 0,00</strong></div>
+                                <div class="stat-box"><span class="stat-label">Gastos</span><strong id="vr-gasto" class="rose-text">R$ 0,00</strong></div>
+                                <div class="stat-box"><span class="stat-label">Saldo</span><strong id="vr-saldo" class="amber-text">R$ 0,00</strong></div>
+                            </div>
+                            <div class="progress-container">
+                                <div class="progress-bar-bg"><div id="vr-progress" class="progress-bar-fill bg-amber" style="width:0%"></div></div>
+                                <div class="progress-labels">
+                                    <span id="vr-pct">0%</span>
+                                    <span id="vr-rec-diario"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Data</th>
+                                    <th>Local</th>
+                                    <th>Benefício</th>
+                                    <th>Categoria</th>
+                                    <th style="text-align:right">Valor</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-vavr"></tbody>
+                            <tfoot>
+                                <tr class="table-footer-row">
+                                    <td colspan="4" style="text-align:right; font-weight:700">Total</td>
+                                    <td id="tfoot-total-vavr" style="text-align:right; font-weight:700"></td>
+                                    <td id="count-vavr" style="text-align:center"></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- DESPESAS -->
+            <section id="tab-despesas" class="tab-pane">
+                <div class="section-header">
+                    <h2>Controle de Despesas</h2>
+                </div>
+                <div class="table-section glass">
+                    <div class="table-toolbar">
+                        <div class="toolbar-left">
+                            <div class="search-box">
+                                <i data-lucide="search"></i>
+                                <input type="text" id="filter-search" placeholder="Buscar despesa...">
+                            </div>
+                            <select id="filter-cartao" class="form-select-sm"><option value="ALL">Todas as Origens</option></select>
+                            <select id="filter-categoria" class="form-select-sm"><option value="ALL">Categorias</option></select>
+                            <select id="filter-natureza" class="form-select-sm"><option value="ALL">Natureza</option><option value="Fixo">Fixo</option><option value="Variável">Variável</option></select>
+                        </div>
+                        <div class="toolbar-right">
+                            <button class="btn btn-primary" onclick="app.openModal('modal-compra')"><i data-lucide="plus"></i> Nova Despesa</button>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Data</th>
+                                    <th>Descrição</th>
+                                    <th>Origem</th>
+                                    <th>Cat.</th>
+                                    <th>Natureza</th>
+                                    <th>Tipo</th>
+                                    <th style="text-align:center">Parc.</th>
+                                    <th style="text-align:right">V. Total</th>
+                                    <th style="text-align:right">V. Parcela</th>
+                                    <th style="text-align:center">Status</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-despesas"></tbody>
+                            <tfoot>
+                                <tr class="table-footer-row">
+                                    <td colspan="7" style="text-align:right; font-weight:700">Total Mês</td>
+                                    <td id="tfoot-total-compras" style="text-align:right; color:var(--text-muted)"></td>
+                                    <td id="tfoot-total-parcelas" style="text-align:right; font-weight:700" class="rose-text"></td>
+                                    <td colspan="2" id="count-despesas" style="text-align:center"></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- RECEITAS -->
+            <section id="tab-receitas" class="tab-pane">
+                <div class="section-header">
+                    <h2>Receitas & Entradas</h2>
+                </div>
+                <div class="table-section glass">
+                    <div class="table-toolbar">
+                        <div class="toolbar-left">
+                            <select id="filter-receita-conta" class="form-select-sm"><option value="ALL">Todas as Contas</option></select>
+                        </div>
+                        <div class="toolbar-right">
+                            <button class="btn btn-success" onclick="app.openModal('modal-receita')"><i data-lucide="plus"></i> Nova Receita</button>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Data</th>
+                                    <th>Descrição</th>
+                                    <th>Conta</th>
+                                    <th>Categoria</th>
+                                    <th>Tipo</th>
+                                    <th style="text-align:right">Valor</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-receitas"></tbody>
+                            <tfoot>
+                                <tr class="table-footer-row">
+                                    <td colspan="5" style="text-align:right; font-weight:700">Total</td>
+                                    <td id="tfoot-total-receitas" style="text-align:right; font-weight:700" class="emerald-text"></td>
+                                    <td id="count-receitas" style="text-align:center"></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- PREVISIBILIDADE -->
+            <section id="tab-previsibilidade" class="tab-pane">
+                <div class="section-header">
+                    <h2>Simulador de Previsibilidade</h2>
+                    <p class="subtitle">Teste o impacto de novas compras no mês seguinte antes de realizá-las.</p>
+                </div>
+                
+                <div id="prev-status-banner" class="status-banner banner-success glass">
+                    <div class="flex items-center gap-4">
+                        <div id="prev-banner-icon" class="banner-icon">🟢</div>
+                        <div class="banner-content">
+                            <h3 id="prev-banner-title">Impacto Saudável</h3>
+                            <p id="prev-banner-desc">Sua capacidade de pagamento suporta esta nova despesa tranquilamente.</p>
+                        </div>
+                    </div>
+                    <span id="prev-banner-badge" class="banner-badge">STATUS: SAUDÁVEL</span>
+                </div>
+
+                <div class="grid-2-cols mb-4">
+                    <div class="glass p-6" style="padding:24px; border-radius:var(--radius-lg);">
+                        <h3 class="mb-4" style="margin-bottom:16px; font-weight:700; font-size:1.2rem;">Parâmetros da Simulação</h3>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label>Descrição do Item</label>
+                                <input type="text" id="sim-prev-desc" class="form-input">
+                            </div>
+                            <div class="form-group">
+                                <label>Valor Parcela / Gasto (R$)</label>
+                                <input type="number" id="sim-prev-valor" class="form-input" step="0.01">
+                            </div>
+                            <div class="form-group">
+                                <label>Nº de Meses (1 = À vista)</label>
+                                <input type="number" id="sim-prev-meses" class="form-input">
+                            </div>
+                            <div class="form-group">
+                                <label>Tipo de Simulação</label>
+                                <select id="sim-prev-tipo" class="form-select">
+                                    <option value="despesa">Despesa (Saída)</option>
+                                    <option value="receita">Receita (Entrada)</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="grid-column: span 2">
+                                <label>Gasto Variável Médio Estimado Mês Seguinte (R$)</label>
+                                <input type="number" id="sim-prev-var" class="form-input" step="0.01">
+                            </div>
+                        </div>
+                        <div class="mt-4 flex gap-2" style="margin-top:20px;">
+                            <button id="btn-efetivar-sim" class="btn btn-primary">Efetivar Simulação (Criar Registro)</button>
+                            <button onclick="app.resetSimuladorPrev()" class="btn btn-outline">Resetar Valores</button>
+                        </div>
+                    </div>
+
+                    <div class="compare-box glass">
+                        <h3><i data-lucide="arrow-right-circle"></i> Impacto em <span id="prev-mes-nome">MÊS QUE VEM</span></h3>
+                        <div class="compare-list">
+                            <div class="compare-item">
+                                <span>Receita Esperada</span>
+                                <strong id="prev-rec-val">R$ 0,00</strong>
+                            </div>
+                            <div class="compare-item">
+                                <span>Gastos Base (Sem Simulação)</span>
+                                <strong id="prev-gastos-val" class="text-muted">R$ 0,00</strong>
+                            </div>
+                            <div class="compare-item highlight">
+                                <span>Sobra Atual (Base)</span>
+                                <strong id="prev-sobra-base" class="emerald-text">R$ 0,00</strong>
+                            </div>
+                            <div class="compare-item highlight" style="border-color:var(--accent-amber); background:rgba(245,158,11,0.1);">
+                                <span>Nova Sobra (Simulada)</span>
+                                <strong id="prev-sobra-sim" class="amber-text">R$ 0,00</strong>
+                            </div>
+                        </div>
+                        <div class="flex justify-between items-center mt-2">
+                            <span id="prev-desc-txt" class="text-sm text-secondary">Com nova saída de R$ 0,00</span>
+                            <span id="prev-diff-badge" class="compare-diff diff-neg">- R$ 0,00</span>
+                        </div>
+                        <div class="flex gap-4 mt-2 text-sm">
+                            <div>Comprometimento Base: <strong id="prev-pct-base">0%</strong></div>
+                            <div>Comprometimento Novo: <strong id="prev-pct-sim">0%</strong></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chart-card glass">
+                    <div class="chart-header">
+                        <h4>Projeção Mês a Mês da Sobra Líquida</h4>
+                    </div>
+                    <div class="chart-container"><canvas id="chartPrevisibilidade"></canvas></div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- MODALS -->
+    <div id="modal-import-csv" class="modal-overlay">
+        <div class="modal-card glass">
+            <div class="modal-header">
+                <h3><i data-lucide="file-up"></i> Importar Extrato CSV</h3>
+                <button class="btn-close" onclick="app.closeModal('modal-import-csv')"><i data-lucide="x"></i></button>
+            </div>
+            <div class="form-group mb-4">
+                <label>Tipo de Extrato</label>
+                <select id="csv-type-select" class="form-select">
+                    <option value="credito">Cartão de Crédito</option>
+                    <option value="debito">Conta Corrente (Débito/Transferência)</option>
+                </select>
+            </div>
+            <div class="form-group mb-4">
+                <label>Período Base (MM/AAAA)</label>
+                <input type="text" id="csv-period-input" class="form-input" placeholder="ex: 07/2026">
+            </div>
+            <div class="form-group mb-4">
+                <label>Vincular ao Cartão / Conta</label>
+                <select id="csv-conta-select" class="form-select"></select>
+            </div>
+            <div class="form-group">
+                <label>Pré-visualização</label>
+                <div id="csv-preview" style="background:rgba(0,0,0,0.5); padding:10px; height:120px; overflow:auto; font-family:monospace; font-size:12px; border-radius:6px;">Carregue um arquivo para visualizar...</div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="app.closeModal('modal-import-csv')">Cancelar</button>
+                <button id="csv-confirm-btn" class="btn btn-primary">Importar Dados</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="modal-compra" class="modal-overlay">
+        <div class="modal-card glass">
+            <div class="modal-header">
+                <h3>Nova Despesa</h3>
+                <button class="btn-close" onclick="app.closeModal('modal-compra')"><i data-lucide="x"></i></button>
+            </div>
+            <div class="form-grid">
+                <div class="form-group col-span-2" style="grid-column:span 2">
+                    <label>Descrição</label>
+                    <input type="text" id="modal-compra-desc" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label>Valor (R$)</label>
+                    <input type="number" id="modal-compra-valor" class="form-input" step="0.01">
+                </div>
+                <div class="form-group">
+                    <label>Data</label>
+                    <input type="date" id="modal-compra-data" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label>Origem</label>
+                    <select id="modal-compra-cartao" class="form-select"></select>
+                </div>
+                <div class="form-group">
+                    <label>Categoria</label>
+                    <select id="modal-compra-cat" class="form-select">
+                        <option>Alimentação</option><option>Moradia</option><option>Transporte</option><option>Lazer</option><option>Saúde</option><option>Educação</option><option>Outros</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Natureza</label>
+                    <select id="modal-compra-natureza" class="form-select">
+                        <option value="Variável">Variável (Gasto Ocasional)</option>
+                        <option value="Fixo">Fixo (Mensalidade/Recorrente)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Tipo</label>
+                    <select id="modal-compra-tipo" class="form-select" onchange="app.toggleParcelasModal()">
+                        <option value="A vista">À Vista</option>
+                        <option value="Parcelado">Parcelado</option>
+                    </select>
+                </div>
+                <div class="form-group" id="group-parcelas" style="display:none;">
+                    <label>Nº Parcelas</label>
+                    <input type="number" id="modal-compra-parcelas" class="form-input" onchange="app.calcPreviewParcela()">
+                </div>
+                <div id="preview-parcela-box" style="display:none; grid-column:span 2" class="mt-2">
+                    <p class="text-sm text-secondary">Valor Estimado da Parcela: <strong id="preview-parcela-val" class="rose-text">R$ 0,00</strong></p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="app.closeModal('modal-compra')">Cancelar</button>
+                <button class="btn btn-primary" onclick="app.saveCompraFromModal()">Salvar Despesa</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="modal-receita" class="modal-overlay">
+        <div class="modal-card glass">
+            <div class="modal-header">
+                <h3>Nova Receita</h3>
+                <button class="btn-close" onclick="app.closeModal('modal-receita')"><i data-lucide="x"></i></button>
+            </div>
+            <div class="form-grid">
+                <div class="form-group" style="grid-column:span 2">
+                    <label>Descrição</label>
+                    <input type="text" id="modal-rec-desc" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label>Valor (R$)</label>
+                    <input type="number" id="modal-rec-valor" class="form-input" step="0.01">
+                </div>
+                <div class="form-group">
+                    <label>Data</label>
+                    <input type="date" id="modal-rec-data" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label>Conta de Destino</label>
+                    <select id="modal-rec-conta" class="form-select"></select>
+                </div>
+                <div class="form-group">
+                    <label>Tipo</label>
+                    <select id="modal-rec-fixo" class="form-select">
+                        <option value="true">Receita Fixa / Salário</option>
+                        <option value="false">Variável / Extra</option>
+                    </select>
+                </div>
+                <div class="form-group" style="grid-column:span 2">
+                    <label>Categoria</label>
+                    <select id="modal-rec-cat" class="form-select">
+                        <option>Salário</option><option>Serviços/Freelance</option><option>Dividendos/Rendimentos</option><option>Aluguel Recebido</option><option>Reembolso/Outros</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="app.closeModal('modal-receita')">Cancelar</button>
+                <button class="btn btn-success" onclick="app.saveReceitaFromModal()">Salvar Receita</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="modal-cartao" class="modal-overlay">
+        <div class="modal-card glass">
+            <div class="modal-header">
+                <h3>Novo Cartão</h3>
+                <button class="btn-close" onclick="app.closeModal('modal-cartao')"><i data-lucide="x"></i></button>
+            </div>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Nome do Cartão</label>
+                    <input type="text" id="modal-cartao-nome" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label>Limite Total</label>
+                    <input type="number" id="modal-cartao-limite" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label>Dia Fechamento</label>
+                    <input type="number" id="modal-cartao-fechamento" class="form-input" min="1" max="31">
+                </div>
+                <div class="form-group">
+                    <label>Dia Vencimento</label>
+                    <input type="number" id="modal-cartao-vencimento" class="form-input" min="1" max="31">
+                </div>
+                <div class="form-group" style="grid-column:span 2">
+                    <label>Cor do Cartão</label>
+                    <select id="modal-cartao-cor" class="form-select">
+                        <option value="purple">Roxo (Nubank)</option>
+                        <option value="blue">Azul (Itaú/BB)</option>
+                        <option value="orange">Laranja (Inter)</option>
+                        <option value="black">Preto (C6/Black)</option>
+                        <option value="emerald">Verde</option>
+                        <option value="red">Vermelho</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="app.closeModal('modal-cartao')">Cancelar</button>
+                <button class="btn btn-primary" onclick="app.saveCartaoFromModal()">Adicionar Cartão</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="modal-conta" class="modal-overlay">
+        <div class="modal-card glass">
+            <div class="modal-header">
+                <h3>Nova Conta Corrente</h3>
+                <button class="btn-close" onclick="app.closeModal('modal-conta')"><i data-lucide="x"></i></button>
+            </div>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Apelido / Nome</label>
+                    <input type="text" id="modal-conta-nome" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label>Instituição</label>
+                    <input type="text" id="modal-conta-banco" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label>Saldo Inicial (R$)</label>
+                    <input type="number" id="modal-conta-saldo" class="form-input" step="0.01">
+                </div>
+                <div class="form-group">
+                    <label>Cor Identificadora</label>
+                    <select id="modal-conta-cor" class="form-select">
+                        <option value="blue">Azul</option>
+                        <option value="emerald">Verde</option>
+                        <option value="purple">Roxo</option>
+                        <option value="orange">Laranja</option>
+                        <option value="black">Preto</option>
+                        <option value="red">Vermelho</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="app.closeModal('modal-conta')">Cancelar</button>
+                <button class="btn btn-primary" onclick="app.saveContaFromModal()">Adicionar Conta</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="modal-investimento" class="modal-overlay">
+        <div class="modal-card glass">
+            <div class="modal-header">
+                <h3>Novo Ativo (Investimento)</h3>
+                <button class="btn-close" onclick="app.closeModal('modal-investimento')"><i data-lucide="x"></i></button>
+            </div>
+            <div class="form-grid">
+                <div class="form-group" style="grid-column:span 2">
+                    <label>Nome do Ativo</label>
+                    <input type="text" id="modal-inv-nome" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label>Tipo</label>
+                    <select id="modal-inv-tipo" class="form-select">
+                        <option>Renda Fixa (CDB/Tesouro/LCI)</option>
+                        <option>Fundo Imobiliário (FII)</option>
+                        <option>Ações / Renda Variável</option>
+                        <option>Criptomoedas</option>
+                        <option>Reserva de Emergência</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Data Aplicação</label>
+                    <input type="date" id="modal-inv-data" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label>Valor Investido</label>
+                    <input type="number" id="modal-inv-valor" class="form-input" step="0.01">
+                </div>
+                <div class="form-group">
+                    <label>Taxa Est. (a.m. %)</label>
+                    <input type="number" id="modal-inv-taxa" class="form-input" step="0.01" value="0.85">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="app.closeModal('modal-investimento')">Cancelar</button>
+                <button class="btn btn-primary" onclick="app.saveInvestimentoFromModal()">Salvar Ativo</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="modal-vavr" class="modal-overlay">
+        <div class="modal-card glass">
+            <div class="modal-header">
+                <h3>Gasto com VA/VR</h3>
+                <button class="btn-close" onclick="app.closeModal('modal-vavr')"><i data-lucide="x"></i></button>
+            </div>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Local / Estabelecimento</label>
+                    <input type="text" id="modal-vavr-desc" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label>Data</label>
+                    <input type="date" id="modal-vavr-data" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label>Benefício Utilizado</label>
+                    <select id="modal-vavr-beneficio" class="form-select">
+                        <option value="VA">Vale Alimentação</option>
+                        <option value="VR">Vale Refeição</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Categoria</label>
+                    <input type="text" id="modal-vavr-cat" class="form-input" value="Alimentação">
+                </div>
+                <div class="form-group" style="grid-column:span 2">
+                    <label>Valor do Gasto</label>
+                    <input type="number" id="modal-vavr-valor" class="form-input" step="0.01">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="app.closeModal('modal-vavr')">Cancelar</button>
+                <button class="btn btn-primary" onclick="app.saveVaVrFromModal()">Salvar Gasto</button>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>
