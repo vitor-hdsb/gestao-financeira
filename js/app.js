@@ -495,6 +495,43 @@ class NexusApp {
         document.getElementById('kpi-gastos').textContent = tableRenderer.formatCurrency(despRes.totalGeral);
         document.getElementById('kpi-gastos-sub').textContent = `Faturas + saídas a vista`;
 
+        const gastosPorCartao = {};
+        despRes.itens.forEach(d => {
+            const rateio = d.rateio || (d.dono ? { [d.dono]: 100 } : { 'meu': 100 });
+            const valMeu = d.incidencia.valor * ((rateio['meu'] || 0) / 100);
+            if (valMeu > 0) {
+                if (!gastosPorCartao[d.cartaoId]) gastosPorCartao[d.cartaoId] = 0;
+                gastosPorCartao[d.cartaoId] += valMeu;
+            }
+        });
+
+        let detalhesGastosHtml = '';
+        for (const cid in gastosPorCartao) {
+            const val = gastosPorCartao[cid];
+            let nomeCartao = 'Desconhecido';
+            let tipoCartao = '';
+            const cConta = data.contas.find(c => c.id === cid);
+            if (cConta) {
+                nomeCartao = cConta.nome;
+                tipoCartao = 'Conta';
+            } else {
+                const cCartao = data.cartoes.find(c => c.id === cid);
+                if (cCartao) {
+                    nomeCartao = cCartao.nome;
+                    tipoCartao = 'Crédito';
+                }
+            }
+            
+            detalhesGastosHtml += `
+                <div style="display: flex; justify-content: space-between; font-size: 11px;">
+                    <span class="text-secondary" style="flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-right: 5px;">${nomeCartao} ${tipoCartao ? `(${tipoCartao})` : ''}</span>
+                    <strong class="rose-text">${tableRenderer.formatCurrency(val)}</strong>
+                </div>
+            `;
+        }
+        const elGastosDet = document.getElementById('kpi-gastos-detalhes');
+        if (elGastosDet) elGastosDet.innerHTML = detalhesGastosHtml;
+
         const totalSaldosIniciais = data.contas.reduce((sum, c) => sum + (c.saldoInicial || 0), 0);
         const kpiSaldoDisponivel = recRes.totalReceitas - despRes.totalGeral + totalSaldosIniciais;
 
@@ -502,18 +539,43 @@ class NexusApp {
         document.getElementById('total-contas-saldo-top').textContent = `Saldo líquido em carteira: ${tableRenderer.formatCurrency(contasRes.saldoTotalAcumulado)}`;
 
         let aReceber = 0;
-        let rateiosHtml = '';
-        for (const dono in despRes.totalPorDono) {
-            if (dono !== 'meu') {
-                const val = despRes.totalPorDono[dono];
-                aReceber += val;
-                if (val > 0) {
-                    rateiosHtml += `<div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); padding: 5px 12px; border-radius: 8px; font-size: 13px;">
-                        <span class="text-secondary">${dono}:</span> <strong class="text-primary">${tableRenderer.formatCurrency(val)}</strong>
-                    </div>`;
+        const detalhesRateio = {};
+
+        despRes.itens.forEach(d => {
+            const rateio = d.rateio || (d.dono ? { [d.dono]: 100 } : { 'meu': 100 });
+            for (const rDono in rateio) {
+                if (rDono !== 'meu') {
+                    const pct = rateio[rDono];
+                    const valDue = d.incidencia.valor * (pct / 100);
+                    if (valDue > 0) {
+                        if (!detalhesRateio[rDono]) detalhesRateio[rDono] = [];
+                        detalhesRateio[rDono].push({ desc: d.desc, val: valDue });
+                        aReceber += valDue;
+                    }
                 }
             }
+        });
+
+        let rateiosHtml = '';
+        for (const dono in detalhesRateio) {
+            const totalDono = detalhesRateio[dono].reduce((sum, item) => sum + item.val, 0);
+            
+            const itensHtml = detalhesRateio[dono].map(item => 
+                `<div style="display: flex; justify-content: space-between; font-size: 11px; margin-top: 6px; border-bottom: 1px dashed rgba(255,255,255,0.1); padding-bottom: 4px;">
+                    <span class="text-secondary" style="flex: 1; max-width: 140px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-right: 10px;" title="${item.desc}">${item.desc}</span>
+                    <span class="text-primary font-medium">${tableRenderer.formatCurrency(item.val)}</span>
+                </div>`
+            ).join('');
+            
+            rateiosHtml += `<div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); padding: 10px 14px; border-radius: 8px; min-width: 220px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 6px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 6px;">
+                    <span class="text-secondary font-bold uppercase text-xs" style="letter-spacing: 0.5px;">${dono}</span> 
+                    <strong class="text-primary" style="font-size: 14px;">${tableRenderer.formatCurrency(totalDono)}</strong>
+                </div>
+                ${itensHtml}
+            </div>`;
         }
+
         const elRateios = document.getElementById('kpi-rateios-terceiros');
         if (elRateios) elRateios.textContent = tableRenderer.formatCurrency(aReceber);
         
