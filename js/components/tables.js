@@ -47,9 +47,14 @@ export const tableRenderer = {
                             <span class="text-xs uppercase opacity-75 font-semibold tracking-wider">${c.banco}</span>
                             <h4 class="cc-name text-lg">${c.nome}</h4>
                         </div>
-                        <button class="btn btn-icon btn-sm" style="background: rgba(0,0,0,0.3); border: none; color: white;" onclick="app.deleteConta('${c.id}')" title="Excluir Conta">
-                            <i data-lucide="trash-2"></i>
-                        </button>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="btn btn-icon btn-sm" style="background: rgba(0,0,0,0.3); border: none; color: white;" onclick="app.editConta('${c.id}')" title="Editar Conta">
+                                <i data-lucide="edit-2"></i>
+                            </button>
+                            <button class="btn btn-icon btn-sm" style="background: rgba(0,0,0,0.3); border: none; color: white;" onclick="app.deleteConta('${c.id}')" title="Excluir Conta">
+                                <i data-lucide="trash-2"></i>
+                            </button>
+                        </div>
                     </div>
                     <div class="my-4 bg-black bg-opacity-30 p-3 rounded-xl border border-white border-opacity-10">
                         <div class="flex justify-between text-xs opacity-80 mb-1">
@@ -225,9 +230,14 @@ export const tableRenderer = {
                 <div class="credit-card-item ${colorMap[card.cor] || 'card-theme-purple'}">
                     <div class="cc-header">
                         <span class="cc-name">${card.nome}</span>
-                        <button class="btn btn-icon btn-sm" style="background: rgba(0,0,0,0.3); border: none; color: white;" onclick="app.deleteCartao('${card.id}')" title="Excluir Cartão">
-                            <i data-lucide="trash-2"></i>
-                        </button>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="btn btn-icon btn-sm" style="background: rgba(0,0,0,0.3); border: none; color: white;" onclick="app.editCartao('${card.id}')" title="Editar Cartão">
+                                <i data-lucide="edit-2"></i>
+                            </button>
+                            <button class="btn btn-icon btn-sm" style="background: rgba(0,0,0,0.3); border: none; color: white;" onclick="app.deleteCartao('${card.id}')" title="Excluir Cartão">
+                                <i data-lucide="trash-2"></i>
+                            </button>
+                        </div>
                     </div>
                     <div class="cc-body" style="flex-direction:column; align-items:flex-start;">
                         <div style="font-size: 11px; opacity: 0.8; margin-bottom: 2px;">Fatura Atual</div>

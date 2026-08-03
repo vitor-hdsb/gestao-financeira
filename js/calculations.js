@@ -349,7 +349,8 @@ export const calcEngine = {
             diasRestantes,
             recDiarioVA,
             recDiarioVR,
-            totalGasto: gastoVA + gastoVR
+            totalGasto: gastoVA + gastoVR,
+            vavrGastos: vavrGastos.filter(g => g.data.slice(0, 7) === mesReferencia)
         };
     },
 

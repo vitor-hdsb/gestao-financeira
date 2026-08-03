@@ -21,11 +21,7 @@ class NexusApp {
         this.populateModalSelects();
         window.__currentRateio = { 'meu': 100 };
         
-        if (state.data.despesas.length === 0 && state.data.cartoes.length === 0 && state.data.contas.length === 0) {
-            state.loadDemoData();
-        } else {
-            this.updateDashboard(state.data);
-        }
+        this.updateDashboard(state.data);
 
         state.subscribe((data) => {
             this.updateDashboard(data);
@@ -672,6 +668,21 @@ class NexusApp {
         this.updatePrevisibilidade();
     }
 
+
+    promptChangeCarga(tipo) {
+        const currentCarga = tipo === 'VA' ? state.data.beneficios.vaCarga : state.data.beneficios.vrCarga;
+        const newCargaStr = prompt(`Informe o novo valor de Carga mensal para o ${tipo}:`, currentCarga);
+        if (newCargaStr !== null) {
+            const newCarga = parseFloat(newCargaStr.replace(',', '.'));
+            if (!isNaN(newCarga) && newCarga >= 0) {
+                if (tipo === 'VA') state.data.beneficios.vaCarga = newCarga;
+                if (tipo === 'VR') state.data.beneficios.vrCarga = newCarga;
+                state.save();
+                this.updateDashboard();
+            }
+        }
+    }
+
     promptChangeTipo(id, currentTipo) {
         if (currentTipo === 'A vista') {
             const num = prompt("Mudar para Parcelado. Em quantas parcelas?", "2");
@@ -726,6 +737,8 @@ class NexusApp {
     }
 
     closeModal(modalId) {
+        if (modalId === 'modal-conta') { document.getElementById('modal-conta-id').value = ''; document.getElementById('modal-conta-nome').value = ''; document.getElementById('modal-conta-banco').value = ''; document.getElementById('modal-conta-saldo').value = ''; }
+        if (modalId === 'modal-cartao') { document.getElementById('modal-cartao-id').value = ''; document.getElementById('modal-cartao-nome').value = ''; document.getElementById('modal-cartao-fechamento').value = ''; document.getElementById('modal-cartao-limite').value = ''; document.getElementById('modal-cartao-vencimento').value = ''; }
         const modal = document.getElementById(modalId);
         if (modal) {
             modal.style.display = 'none';
@@ -777,33 +790,56 @@ class NexusApp {
     }
 
     saveCartaoFromModal() {
+        const idInput = document.getElementById('modal-cartao-id').value;
         const nome = document.getElementById('modal-cartao-nome').value.trim();
         const limite = parseFloat(document.getElementById('modal-cartao-limite').value) || 0;
-        const cor = document.getElementById('modal-cartao-cor').value;
         const fechamento = parseInt(document.getElementById('modal-cartao-fechamento').value) || 5;
-        const vencimento = parseInt(document.getElementById('modal-cartao-vencimento').value) || 12;
+        const vencimento = parseInt(document.getElementById('modal-cartao-vencimento').value) || 10;
+        const cor = document.getElementById('modal-cartao-cor').value;
 
-        if (!nome || limite <= 0) {
-            alert('Informe o nome e um limite válido.');
+        if (!nome) {
+            alert('Preencha Nome do Cartão.');
             return;
         }
 
-        state.addCartao({ nome, limite, cor, fechamento, vencimento });
+        if (idInput) {
+            state.updateCartao(idInput, { nome, limite, diaFechamento: fechamento, diaVencimento: vencimento, cor });
+        } else {
+            state.addCartao({
+                id: 'card_' + Date.now(),
+                nome,
+                limite,
+                diaFechamento: fechamento,
+                diaVencimento: vencimento,
+                cor
+            });
+        }
         this.closeModal('modal-cartao');
     }
 
     saveContaFromModal() {
+        const idInput = document.getElementById('modal-conta-id').value;
         const nome = document.getElementById('modal-conta-nome').value.trim();
         const banco = document.getElementById('modal-conta-banco').value.trim();
-        const saldoInicial = parseFloat(document.getElementById('modal-conta-saldo').value) || 0;
+        const saldo = parseFloat(document.getElementById('modal-conta-saldo').value) || 0;
         const cor = document.getElementById('modal-conta-cor').value;
 
         if (!nome || !banco) {
-            alert('Informe o nome da conta e a instituição.');
+            alert('Preencha Nome e Banco.');
             return;
         }
-
-        state.addConta({ nome, banco, saldoInicial, cor });
+        
+        if (idInput) {
+            state.updateConta(idInput, { nome, banco, saldoInicial: saldo, cor });
+        } else {
+            state.addConta({
+                id: 'conta_' + Date.now(),
+                nome,
+                banco,
+                saldoInicial: saldo,
+                cor
+            });
+        }
         this.closeModal('modal-conta');
     }
 
@@ -865,6 +901,30 @@ class NexusApp {
 
     deleteCompra(id) { if (confirm('Tem certeza que deseja remover esta despesa?')) state.deleteCompra(id); }
     deleteCartao(id) { if (confirm('Atenção: Tem certeza que deseja remover este cartão?')) state.deleteCartao(id); }
+    
+    editConta(id) {
+        const conta = state.data.contas.find(c => c.id === id);
+        if (!conta) return;
+        document.getElementById('modal-conta-id').value = conta.id;
+        document.getElementById('modal-conta-nome').value = conta.nome;
+        document.getElementById('modal-conta-banco').value = conta.banco;
+        document.getElementById('modal-conta-saldo').value = conta.saldoInicial;
+        document.getElementById('modal-conta-cor').value = conta.cor;
+        this.openModal('modal-conta');
+    }
+
+    editCartao(id) {
+        const cartao = state.data.cartoes.find(c => c.id === id);
+        if (!cartao) return;
+        document.getElementById('modal-cartao-id').value = cartao.id;
+        document.getElementById('modal-cartao-nome').value = cartao.nome;
+        document.getElementById('modal-cartao-limite').value = cartao.limite;
+        document.getElementById('modal-cartao-fechamento').value = cartao.diaFechamento || 5;
+        document.getElementById('modal-cartao-vencimento').value = cartao.diaVencimento;
+        document.getElementById('modal-cartao-cor').value = cartao.cor;
+        this.openModal('modal-cartao');
+    }
+
     deleteConta(id) { if (confirm('Atenção: Tem certeza que deseja remover esta conta bancária ou carteira?')) state.deleteConta(id); }
     deleteReceita(id) { if (confirm('Deseja remover este registro de receita ou entrada?')) state.deleteReceita(id); }
     deleteInvestimento(id) { if (confirm('Deseja remover este ativo da carteira?')) state.deleteInvestimento(id); }
