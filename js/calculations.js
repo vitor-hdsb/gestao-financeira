@@ -28,6 +28,32 @@ export const calcEngine = {
         return date.toISOString().slice(0, 7);
     },
 
+    _getValorHistorico(despesa, targetMes) {
+        if (despesa.valoresMensais && despesa.valoresMensais[targetMes] !== undefined) {
+            return despesa.valoresMensais[targetMes];
+        }
+        if (despesa.natureza === 'fixo_absoluto') return despesa.valorTotal;
+        
+        // fixo_variavel
+        const mesCompra = despesa.data.slice(0, 7);
+        const [anoC, mesC] = mesCompra.split('-').map(Number);
+        const [anoR, mesR] = targetMes.split('-').map(Number);
+        const diffMeses = (anoR - anoC) * 12 + (mesR - mesC);
+        
+        if (diffMeses <= 0) return despesa.valorTotal;
+        
+        let sum = 0;
+        let count = 0;
+        for (let i = 1; i <= 3; i++) {
+            if (diffMeses - i >= 0) {
+                const pastMes = this.getOffsetMonth(targetMes, -i);
+                sum += this._getValorHistorico(despesa, pastMes);
+                count++;
+            }
+        }
+        return count > 0 ? sum / count : despesa.valorTotal;
+    },
+
     getIncidenciaDespesaNoMes(despesa, mesReferencia) {
         const mesCompra = despesa.data.slice(0, 7);
         const [anoC, mesC] = mesCompra.split('-').map(Number);
@@ -36,6 +62,18 @@ export const calcEngine = {
         const diffMeses = (anoR - anoC) * 12 + (mesR - mesC);
 
         if (diffMeses < 0) return null;
+        
+        const isRecorrente = despesa.natureza === 'fixo_absoluto' || despesa.natureza === 'fixo_variavel' || despesa.natureza === 'Fixo';
+
+        if (isRecorrente) {
+            return {
+                ativa: true,
+                numeroParcela: diffMeses + 1,
+                totalParcelas: 999,
+                valor: this._getValorHistorico(despesa, mesReferencia),
+                quitadaNoMes: false
+            };
+        }
 
         if (despesa.tipo === 'A vista' || despesa.parcelas <= 1) {
             if (diffMeses === 0) {
@@ -85,31 +123,38 @@ export const calcEngine = {
         const totalPorDono = { 'meu': 0 };
 
         despesas.forEach(d => {
+            const normalizedNatureza = d.natureza === 'Fixo' ? 'fixo_absoluto' : 
+                                     d.natureza === 'Variável' ? 'variavel' : 
+                                     (d.natureza || 'variavel');
+
             if (cartaoId !== 'ALL' && d.cartaoId !== cartaoId) return;
             if (categoria !== 'ALL' && d.cat !== categoria) return;
-            if (natureza !== 'ALL' && (d.natureza || 'Variável') !== natureza) return;
+            if (natureza !== 'ALL' && normalizedNatureza !== natureza) return;
 
             const inc = this.getIncidenciaDespesaNoMes(d, mesReferencia);
             if (inc && inc.ativa) {
                 itensFiltrados.push({
                     ...d,
+                    natureza: normalizedNatureza,
                     incidencia: inc
                 });
-                totalGeral += inc.valor;
-                if (d.tipo === 'Parcelado' && d.parcelas > 1) {
-                    totalParcelado += inc.valor;
-                }
-                if ((d.natureza || 'Variável') === 'Fixo') {
-                    totalFixo += inc.valor;
-                } else {
-                    totalVariavel += inc.valor;
-                }
+                
                 const rateio = d.rateio || (d.dono ? { [d.dono]: 100 } : { 'meu': 100 });
                 for (const rDono in rateio) {
-                    const pct = rateio[rDono];
-                    const valorRateado = inc.valor * (pct / 100);
                     if (!totalPorDono[rDono]) totalPorDono[rDono] = 0;
-                    totalPorDono[rDono] += valorRateado;
+                    totalPorDono[rDono] += inc.valor * (rateio[rDono] / 100);
+                }
+                
+                const valorMeu = inc.valor * ((rateio['meu'] || 0) / 100);
+
+                totalGeral += valorMeu;
+                if (d.tipo === 'Parcelado' && d.parcelas > 1) {
+                    totalParcelado += valorMeu;
+                }
+                if (normalizedNatureza === 'fixo_absoluto' || normalizedNatureza === 'fixo_variavel') {
+                    totalFixo += valorMeu;
+                } else {
+                    totalVariavel += valorMeu;
                 }
             }
         });
@@ -161,18 +206,23 @@ export const calcEngine = {
             let saidasMes = 0;
             despesas.forEach(d => {
                 if (d.cartaoId === conta.id) {
-                    const inc = this.getIncidenciaDespesaNoMes(d, mesAtual);
-                    if (inc && inc.ativa) saidasMes += inc.valor;
-
                     const mesCompra = d.data.slice(0, 7);
                     if (mesCompra <= mesAtual) {
-                        if (d.tipo === 'A vista') somaSaidas += d.valorTotal;
-                        else {
-                            const [anoC, mesC] = mesCompra.split('-').map(Number);
-                            const [anoA, mesA] = mesAtual.split('-').map(Number);
-                            const diff = (anoA - anoC) * 12 + (mesA - mesC) + 1;
-                            const parcPagas = Math.min(d.parcelas, Math.max(0, diff));
-                            somaSaidas += parcPagas * d.valorParcela;
+                        const [anoC, mesC] = mesCompra.split('-').map(Number);
+                        const [anoA, mesA] = mesAtual.split('-').map(Number);
+                        const diffMeses = (anoA - anoC) * 12 + (mesA - mesC);
+                        
+                        const rateio = d.rateio || (d.dono ? { [d.dono]: 100 } : { 'meu': 100 });
+                        const pctMeu = (rateio['meu'] || 0) / 100;
+                        
+                        for (let i = 0; i <= diffMeses; i++) {
+                            const loopMes = this.getOffsetMonth(mesCompra, i);
+                            const inc = this.getIncidenciaDespesaNoMes(d, loopMes);
+                            if (inc && inc.ativa) {
+                                const valorMeu = inc.valor * pctMeu;
+                                somaSaidas += valorMeu;
+                                if (i === diffMeses) saidasMes += valorMeu;
+                            }
                         }
                     }
                 }
@@ -190,6 +240,32 @@ export const calcEngine = {
                 saldoAtual
             });
         });
+
+        let faturasAcumuladas = 0;
+        despesas.forEach(d => {
+            const isConta = contas.some(c => c.id === d.cartaoId);
+            if (!isConta) {
+                const mesCompra = d.data.slice(0, 7);
+                if (mesCompra <= mesAtual) {
+                    const [anoC, mesC] = mesCompra.split('-').map(Number);
+                    const [anoA, mesA] = mesAtual.split('-').map(Number);
+                    const diffMeses = (anoA - anoC) * 12 + (mesA - mesC);
+                    
+                    const rateio = d.rateio || (d.dono ? { [d.dono]: 100 } : { 'meu': 100 });
+                    const pctMeu = (rateio['meu'] || 0) / 100;
+                    
+                    for (let i = 0; i <= diffMeses; i++) {
+                        const loopMes = this.getOffsetMonth(mesCompra, i);
+                        const inc = this.getIncidenciaDespesaNoMes(d, loopMes);
+                        if (inc && inc.ativa) {
+                            faturasAcumuladas += (inc.valor * pctMeu);
+                        }
+                    }
+                }
+            }
+        });
+
+        saldoTotalAcumulado -= faturasAcumuladas;
 
         return {
             saldoTotalAcumulado,

@@ -100,6 +100,18 @@
                     </div>
                 </div>
 
+                <div class="glass mb-4" style="padding: 15px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; border-left: 4px solid var(--primary-color);">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <div class="kpi-icon text-secondary" style="background: rgba(255,255,255,0.05);"><i data-lucide="users"></i></div>
+                        <div>
+                            <span class="kpi-label" style="font-size: 13px;">A Receber de Terceiros (Rateios do Mês)</span>
+                            <div class="kpi-value text-secondary" id="kpi-rateios-terceiros" style="font-size: 1.25rem;">R$ 0,00</div>
+                        </div>
+                    </div>
+                    <div id="kpi-rateios-detalhes" style="display: flex; gap: 15px; flex-wrap: wrap; justify-content: flex-end; align-items: center;">
+                    </div>
+                </div>
+
                 <div class="charts-grid mb-4">
                     <div class="chart-card glass col-span-2">
                         <div class="chart-header">
@@ -287,7 +299,7 @@
                             </div>
                             <select id="filter-cartao" class="form-select-sm"><option value="ALL">Todas as Origens</option></select>
                             <select id="filter-categoria" class="form-select-sm"><option value="ALL">Categorias</option></select>
-                            <select id="filter-natureza" class="form-select-sm"><option value="ALL">Natureza</option><option value="Fixo">Fixo</option><option value="Variável">Variável</option></select>
+                            <select id="filter-natureza" class="form-select-sm"><option value="ALL">Natureza</option><option value="fixo_absoluto">Fixo Absoluto</option><option value="fixo_variavel">Fixo Variável</option><option value="variavel">Variável</option></select>
                         </div>
                         <div class="toolbar-right">
                             <button class="btn btn-primary" onclick="app.openModal('modal-compra')"><i data-lucide="plus"></i> Nova Despesa</button>
@@ -595,10 +607,11 @@
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>Natureza</label>
+                    <label class="form-label">Natureza (Fixo vs Variável)</label>
                     <select id="modal-compra-natureza" class="form-select">
-                        <option value="Variável">Variável (Gasto Ocasional)</option>
-                        <option value="Fixo">Fixo (Mensalidade/Recorrente)</option>
+                        <option value="variavel">Variável (Única)</option>
+                        <option value="fixo_absoluto">Fixo Absoluto (Recorrente Exato)</option>
+                        <option value="fixo_variavel">Fixo Variável (Recorrente c/ Média Móvel)</option>
                     </select>
                 </div>
                 <div class="form-group">

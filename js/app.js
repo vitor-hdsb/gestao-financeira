@@ -174,10 +174,7 @@ class NexusApp {
             const input = document.getElementById('new-pessoa-rateio-input');
             const nome = input?.value.trim();
             if (nome) {
-                state.addPessoa(state.data.config.mesAtual, nome);
-                input.value = '';
-                
-                // Salvar inputs atuais para não perder o preenchimento
+                // Salvar inputs atuais ANTES de acionar a recarga do estado
                 const tempRateio = {};
                 const pessoas = ['meu', ...state.getPessoas(state.data.config.mesAtual)];
                 pessoas.forEach(p => {
@@ -185,9 +182,16 @@ class NexusApp {
                     if (el) tempRateio[p] = parseFloat(el.value) || 0;
                 });
                 
+                state.addPessoa(state.data.config.mesAtual, nome);
+                input.value = '';
+                
                 window.__tempRateioInputs = tempRateio;
                 window.__tempRateioTargetIdx = this.rateioTargetIdx;
-                this.openRateioModal('TEMP_REFRESH');
+                
+                // Forçar o re-render do modal logo após o state notify
+                setTimeout(() => {
+                    this.openRateioModal('TEMP_REFRESH');
+                }, 10);
             }
         });
         document.querySelector('[onclick="app.openModal(\'modal-compra\')"]')?.addEventListener('click', () => {
@@ -491,8 +495,30 @@ class NexusApp {
         document.getElementById('kpi-gastos').textContent = tableRenderer.formatCurrency(despRes.totalGeral);
         document.getElementById('kpi-gastos-sub').textContent = `Faturas + saídas a vista`;
 
-        document.getElementById('kpi-contas-saldo').textContent = tableRenderer.formatCurrency(contasRes.saldoTotalAcumulado);
+        const totalSaldosIniciais = data.contas.reduce((sum, c) => sum + (c.saldoInicial || 0), 0);
+        const kpiSaldoDisponivel = recRes.totalReceitas - despRes.totalGeral + totalSaldosIniciais;
+
+        document.getElementById('kpi-contas-saldo').textContent = tableRenderer.formatCurrency(kpiSaldoDisponivel);
         document.getElementById('total-contas-saldo-top').textContent = `Saldo líquido em carteira: ${tableRenderer.formatCurrency(contasRes.saldoTotalAcumulado)}`;
+
+        let aReceber = 0;
+        let rateiosHtml = '';
+        for (const dono in despRes.totalPorDono) {
+            if (dono !== 'meu') {
+                const val = despRes.totalPorDono[dono];
+                aReceber += val;
+                if (val > 0) {
+                    rateiosHtml += `<div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); padding: 5px 12px; border-radius: 8px; font-size: 13px;">
+                        <span class="text-secondary">${dono}:</span> <strong class="text-primary">${tableRenderer.formatCurrency(val)}</strong>
+                    </div>`;
+                }
+            }
+        }
+        const elRateios = document.getElementById('kpi-rateios-terceiros');
+        if (elRateios) elRateios.textContent = tableRenderer.formatCurrency(aReceber);
+        
+        const elRateiosDet = document.getElementById('kpi-rateios-detalhes');
+        if (elRateiosDet) elRateiosDet.innerHTML = rateiosHtml;
 
         document.getElementById('kpi-patrimonio').textContent = tableRenderer.formatCurrency(invRes.totalInvestido);
         document.getElementById('kpi-rendimento-est').textContent = `+ ${tableRenderer.formatCurrency(invRes.rendimentoMensalTotal)} / mês est.`;
@@ -647,6 +673,15 @@ class NexusApp {
     }
 
 
+    updateCompraValorMensal(id, mes, value) {
+        value = parseFloat(value);
+        if (isNaN(value) || value <= 0) return;
+        state.updateCompraValorMensal(id, mes, value);
+        this.updateDespesasTableOnly();
+        chartRenderer.updateAllCharts(state.data);
+        this.updatePrevisibilidade();
+    }
+
     updateExpenseField(id, field, value) {
         if (field === 'valorTotal') {
             value = parseFloat(value);
@@ -775,7 +810,14 @@ class NexusApp {
         const cartaoId = document.getElementById('modal-compra-cartao').value;
         const cat = document.getElementById('modal-compra-cat').value;
         const natureza = document.getElementById('modal-compra-natureza').value;
-        const tipo = document.getElementById('modal-compra-tipo').value;
+        
+        let tipo = 'A vista';
+        if (natureza === 'fixo_absoluto' || natureza === 'fixo_variavel') {
+            tipo = 'Fixo';
+        } else {
+            tipo = document.getElementById('modal-compra-tipo').value === 'Parcelado' ? 'Parcelado' : 'A vista';
+        }
+        
         const rateio = window.__currentRateio || { 'meu': 100 };
         const parcelas = parseInt(document.getElementById('modal-compra-parcelas').value) || 1;
         const valorTotal = parseFloat(document.getElementById('modal-compra-valor').value) || 0;

@@ -352,9 +352,14 @@ export const tableRenderer = {
                     ? `<span class="badge badge-warning" style="cursor:pointer;" onclick="app.promptChangeTipo('${item.id}', '${item.tipo}')" title="Clique para alterar"><i data-lucide="layers"></i> ${inc.numeroParcela}/${inc.totalParcelas}x</span>` 
                     : `<span class="badge badge-info" style="cursor:pointer;" onclick="app.promptChangeTipo('${item.id}', '${item.tipo}')" title="Clique para alterar">A vista</span>`;
                 
-                const badgeNatureza = (item.natureza || 'Variável') === 'Fixo'
-                    ? `<span class="badge badge-fixo" style="cursor:pointer;" onclick="app.toggleNatureza('${item.id}')" title="Clique para alternar Fixo/Variável"><i data-lucide="lock"></i> Fixo</span>`
-                    : `<span class="badge badge-variavel" style="cursor:pointer;" onclick="app.toggleNatureza('${item.id}')" title="Clique para alternar Fixo/Variável"><i data-lucide="zap"></i> Variável</span>`;
+                const n = item.natureza || 'variavel';
+                const badgeNatureza = `
+                    <select class="form-input inline-edit" style="width:115px; font-size:12px; padding:2px; background:transparent; border-bottom:1px solid rgba(255,255,255,0.2);" onchange="app.updateExpenseField('${item.id}', 'natureza', this.value)">
+                        <option value="variavel" ${(n === 'variavel' || n === 'Variável') ? 'selected' : ''}>Variável</option>
+                        <option value="fixo_absoluto" ${(n === 'fixo_absoluto' || n === 'Fixo') ? 'selected' : ''}>Fixo Absoluto</option>
+                        <option value="fixo_variavel" ${(n === 'fixo_variavel') ? 'selected' : ''}>Fixo Variável</option>
+                    </select>
+                `;
 
                 const rateioObj = item.rateio || (item.dono ? { [item.dono]: 100 } : { 'meu': 100 });
                 let badgeDono = `<div style="display:flex; flex-direction:column; gap:2px; cursor:pointer;" onclick="app.openRateioModal('${item.id}')" title="Clique para alterar o rateio">`;
@@ -405,7 +410,10 @@ export const tableRenderer = {
                         <td class="text-right">
                             <div style="display:flex; justify-content:flex-end; align-items:center;">
                                 <span>R$</span>
-                                <input type="number" step="0.01" value="${item.valorTotal.toFixed(2)}" class="form-input inline-edit" style="width:100px; font-size:15px; text-align:right; background:transparent; border-bottom:1px solid rgba(255,255,255,0.2); padding:2px;" onchange="app.updateExpenseField('${item.id}', 'valorTotal', this.value)">
+                                ${(item.natureza === 'fixo_absoluto' || item.natureza === 'fixo_variavel') ? 
+                                `<input type="number" step="0.01" value="${inc.valor.toFixed(2)}" class="form-input inline-edit" style="width:100px; font-size:15px; text-align:right; background:transparent; border-bottom:1px solid rgba(255,255,255,0.2); padding:2px;" onchange="app.updateCompraValorMensal('${item.id}', '${mesReferencia}', this.value)">` :
+                                `<input type="number" step="0.01" value="${item.valorTotal.toFixed(2)}" class="form-input inline-edit" style="width:100px; font-size:15px; text-align:right; background:transparent; border-bottom:1px solid rgba(255,255,255,0.2); padding:2px;" onchange="app.updateExpenseField('${item.id}', 'valorTotal', this.value)">`
+                                }
                             </div>
                         </td>
                         <td class="text-right">${this.formatCurrency(inc.valor)}</td>

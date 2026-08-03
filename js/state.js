@@ -40,6 +40,12 @@ class StateManager {
             const saved = localStorage.getItem(STORAGE_KEY);
             if (saved) {
                 const parsed = JSON.parse(saved);
+                if (parsed.despesas) {
+                    parsed.despesas.forEach(d => {
+                        if (d.natureza === undefined) d.natureza = d.fixo ? 'fixo_absoluto' : 'variavel';
+                        if (d.valoresMensais === undefined) d.valoresMensais = {};
+                    });
+                }
                 return { ...defaultState, ...parsed };
             }
         } catch (e) {
@@ -197,6 +203,18 @@ class StateManager {
         });
         this.save();
         return newId;
+    }
+
+
+    updateCompraValorMensal(id, mes, novoValor) {
+        const idx = this.data.despesas.findIndex(d => d.id === id);
+        if (idx !== -1) {
+            if (!this.data.despesas[idx].valoresMensais) {
+                this.data.despesas[idx].valoresMensais = {};
+            }
+            this.data.despesas[idx].valoresMensais[mes] = novoValor;
+            this.save();
+        }
     }
 
     updateCompra(id, updatedFields) {
