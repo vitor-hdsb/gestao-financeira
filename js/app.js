@@ -49,7 +49,8 @@ class NexusApp {
             signInWithEmailAndPassword(auth, email, pass)
                 .catch(err => {
                     errorDiv.style.display = 'block';
-                    errorDiv.innerText = "Erro: Usuário não encontrado ou senha inválida";
+                    errorDiv.innerText = "Erro: " + err.code + " - " + err.message;
+                    console.error(err);
                     btnLogin.innerText = "Entrar / Cadastrar";
                 });
         });
