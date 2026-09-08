@@ -531,3 +531,38 @@ body {
     .benefit-stats { grid-template-columns: 1fr; }
     .status-banner { flex-direction: column; text-align: center; }
 }
+
+/* Slicers de Categoria */
+.slicer-container {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 12px 0;
+    margin-bottom: 16px;
+    scrollbar-width: none; /* Firefox */
+}
+.slicer-container::-webkit-scrollbar {
+    display: none; /* Chrome/Safari */
+}
+.slicer-btn {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--text-secondary);
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.3s ease;
+}
+.slicer-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-primary);
+}
+.slicer-btn.active {
+    background: var(--primary-color);
+    color: #fff;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 15px rgba(99, 102, 241, 0.4);
+}

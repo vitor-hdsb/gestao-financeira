@@ -1,13 +1,11 @@
 export function importCsv(file, options = {}) {
     const { type: forcedType, period, accountId } = options;
     return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
+        const processText = (csvText) => {
             try {
                 if (typeof Papa === 'undefined') {
                     throw new Error("PapaParse não foi carregado (verifique a conexão com a internet ou o CDN).");
                 }
-                const csvText = e.target.result;
                 const config = {
                     header: false,
                     skipEmptyLines: 'greedy',
@@ -148,7 +146,22 @@ export function importCsv(file, options = {}) {
                 reject(error);
             }
         };
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const text = e.target.result;
+            if (text.includes('\uFFFD')) {
+                // Falhou ao ler como UTF-8 (caracteres quebrados = \uFFFD). Tentar como ISO-8859-1.
+                const fallbackReader = new FileReader();
+                fallbackReader.onload = (e2) => processText(e2.target.result);
+                fallbackReader.onerror = (err) => reject(err);
+                fallbackReader.readAsText(file, 'ISO-8859-1');
+            } else {
+                // Leu com sucesso em UTF-8
+                processText(text);
+            }
+        };
         reader.onerror = (e) => reject(e);
-        reader.readAsText(file, 'ISO-8859-1'); // Bancos brasileiros costumam usar latin1/ISO-8859-1
+        reader.readAsText(file, 'UTF-8');
     });
 }

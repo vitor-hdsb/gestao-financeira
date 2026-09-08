@@ -63,7 +63,8 @@ export const calcEngine = {
 
         if (diffMeses < 0) return null;
         
-        const isRecorrente = despesa.natureza === 'fixo_absoluto' || despesa.natureza === 'fixo_variavel' || despesa.natureza === 'Fixo';
+        const isParcelado = despesa.tipo === 'Parcelado' && despesa.parcelas > 1;
+        const isRecorrente = !isParcelado && (despesa.natureza === 'fixo_absoluto' || despesa.natureza === 'fixo_variavel' || despesa.natureza === 'Fixo');
 
         if (isRecorrente) {
             return {
@@ -102,11 +103,16 @@ export const calcEngine = {
 
             if (eliminadaPorQuitacao) return null;
 
+            let valParcela = despesa.valorParcela;
+            if (despesa.valoresMensais && despesa.valoresMensais[mesReferencia] !== undefined) {
+                valParcela = despesa.valoresMensais[mesReferencia];
+            }
+
             return {
                 ativa: true,
                 numeroParcela: numeroParcela,
                 totalParcelas: despesa.parcelas,
-                valor: despesa.valorParcela,
+                valor: valParcela,
                 quitadaNoMes: despesa.quitada && despesa.mesQuitacao === mesReferencia
             };
         }
@@ -439,68 +445,68 @@ export const calcEngine = {
      */
     calcPrevisibilidade(stateData, simParams) {
         const curMonth = stateData.config.mesAtual;
-        const nextMonth = this.getOffsetMonth(curMonth, 1); // ex: 2026-08
+        const simValor = parseFloat(simParams.valor) || 0;
+        const simMeses = parseInt(simParams.meses) || 1;
+        const simTipo = simParams.tipo || 'despesa'; // 'despesa' ou 'receita'
+        const varEstimado = simParams.estVariavel !== undefined ? parseFloat(simParams.estVariavel) : 2500.00;
 
-        // 1. Receitas Previsíveis Esperadas para o Mês Seguinte
-        // (Soma de receitas fixas/recorrentes + rendimento de investimentos estimado)
-        let receitasBase = 0;
-        stateData.receitas.forEach(r => {
-            // Se for receita fixa (Salário, Aluguel...) consideramos recorrente
-            if (r.fixo) receitasBase += r.valor;
-        });
+        let totalReceitaAcumulada = 0;
+        let totalFixosAcumulados = 0;
+        let totalParcelasAcumuladas = 0;
+        
+        for (let i = 1; i <= simMeses; i++) {
+            const loopMonth = this.getOffsetMonth(curMonth, i);
+            
+            let recMes = 0;
+            stateData.receitas.forEach(r => {
+                const nomeLower = (r.desc || '').toLowerCase();
+                if (nomeLower.includes('va') || nomeLower.includes('vale alimentação') ||
+                    nomeLower.includes('vr') || nomeLower.includes('vale refeição')) {
+                    return;
+                }
+                if (r.fixo) recMes += r.valor;
+            });
+            
+            let fixosMes = 0;
+            let parcelasMes = 0;
+            
+            stateData.despesas.forEach(d => {
+                const rateio = d.rateio || (d.dono ? { [d.dono]: 100 } : { 'meu': 100 });
+                const pctMeu = (rateio['meu'] || 0) / 100;
+                if (pctMeu === 0) return;
+
+                const inc = this.getIncidenciaDespesaNoMes(d, loopMonth);
+                const isParcelado = d.tipo === 'Parcelado' && d.parcelas > 1;
+                const isFixo = !isParcelado && (d.natureza === 'fixo_absoluto' || d.natureza === 'fixo_variavel' || d.natureza === 'Fixo');
+                
+                if (inc && inc.ativa) {
+                    const valorMeu = inc.valor * pctMeu;
+                    if (isFixo) {
+                        fixosMes += valorMeu;
+                    } else if (d.tipo === 'Parcelado' && d.parcelas > 1) {
+                        parcelasMes += valorMeu;
+                    }
+                } else if (!inc && isFixo) {
+                    const valMeu = (d.valorParcela || d.valorTotal) * pctMeu;
+                    fixosMes += valMeu;
+                }
+            });
+            
+            totalReceitaAcumulada += recMes;
+            totalFixosAcumulados += fixosMes;
+            totalParcelasAcumuladas += parcelasMes;
+        }
+
         const invRes = this.calcInvestimentos(stateData.investimentos, stateData.config);
         const rendimentoEst = invRes.rendimentoMensalTotal || 0;
-        const totalReceitaEsperada = receitasBase + rendimentoEst;
-
-        // 2. Gastos Já Contratados / Comprometidos para o Mês Seguinte
-        // a) Gastos Fixos Recorrentes (Aluguel, plano de saúde, internet, seguros...)
-        let gastosFixosEsperados = 0;
-        // b) Parcelas Futuras de Cartão de Crédito que já estão ativas e cairão em nextMonth
-        let parcelasAtivasEsperadas = 0;
-        const donosResumo = { 'meu': 0 };
-
-        stateData.despesas.forEach(d => {
-            const rateio = d.rateio || (d.dono ? { [d.dono]: 100 } : { 'meu': 100 });
-
-            const incNext = this.getIncidenciaDespesaNoMes(d, nextMonth);
-            if (incNext && incNext.ativa) {
-                if ((d.natureza || 'Variável') === 'Fixo') {
-                    gastosFixosEsperados += incNext.valor;
-                    for (const rDono in rateio) {
-                        if (!donosResumo[rDono]) donosResumo[rDono] = 0;
-                        donosResumo[rDono] += incNext.valor * (rateio[rDono] / 100);
-                    }
-                } else if (d.tipo === 'Parcelado' && d.parcelas > 1) {
-                    parcelasAtivasEsperadas += incNext.valor;
-                    for (const rDono in rateio) {
-                        if (!donosResumo[rDono]) donosResumo[rDono] = 0;
-                        donosResumo[rDono] += incNext.valor * (rateio[rDono] / 100);
-                    }
-                }
-            } else if ((d.natureza || 'Variável') === 'Fixo') {
-                // Se é um gasto fixo cadastrado (ex: Aluguel ou Internet a vista), projetamos ele como recorrente para o próximo mês
-                const val = (d.valorParcela || d.valorTotal);
-                gastosFixosEsperados += val;
-                for (const rDono in rateio) {
-                    if (!donosResumo[rDono]) donosResumo[rDono] = 0;
-                    donosResumo[rDono] += val * (rateio[rDono] / 100);
-                }
-            }
-        });
-
-        // c) Estimativa de Gastos Variáveis / Estilo de Vida
-        // Assumimos que o variável estimado é 100% "meu" por padrão
-        const varEstimado = simParams.estVariavel !== undefined ? parseFloat(simParams.estVariavel) : 2500.00;
-        donosResumo['meu'] += varEstimado;
+        
+        const totalReceitaEsperada = (totalReceitaAcumulada / simMeses) + rendimentoEst;
+        const gastosFixosEsperados = (totalFixosAcumulados / simMeses);
+        const parcelasAtivasEsperadas = (totalParcelasAcumuladas / simMeses);
 
         const totalGastosBase = gastosFixosEsperados + parcelasAtivasEsperadas + varEstimado;
         const saldoLivreBase = totalReceitaEsperada - totalGastosBase;
         const pctComprometidoBase = totalReceitaEsperada > 0 ? (totalGastosBase / totalReceitaEsperada) * 100 : 0;
-
-        // 3. Simulação Interativa (Ex: Nova parcela de R$ 200 por 6 meses)
-        const simValor = parseFloat(simParams.valor) || 0;
-        const simMeses = parseInt(simParams.meses) || 1;
-        const simTipo = simParams.tipo || 'despesa'; // 'despesa' ou 'receita'
 
         let totalGastosSimulado = totalGastosBase;
         let totalReceitaSimulada = totalReceitaEsperada;
@@ -515,15 +521,13 @@ export const calcEngine = {
         const diferencaSaldo = saldoLivreSimulado - saldoLivreBase;
         const pctComprometidoSimulado = totalReceitaSimulada > 0 ? (totalGastosSimulado / totalReceitaSimulada) * 100 : 0;
 
-        // 4. Semáforo de Alerta de Saúde Financeira (Status Executivo)
-        let semaforo = { status: 'SUCCESS', titulo: '🟢 Confortável & Seguro', desc: 'Sua capacidade financeira absorve perfeitamente esse novo compromisso sem comprometer sua reserva ou estilo de vida.' };
+        let semaforo = { status: 'SUCCESS', titulo: '🟢 Confortável & Seguro', desc: `Na média dos próximos ${simMeses} meses, sua capacidade absorve esse compromisso sem afetar o estilo de vida.` };
         if (saldoLivreSimulado < 0) {
-            semaforo = { status: 'DANGER', titulo: '🔴 Alerta Vermelho: Déficit Projetado!', desc: `Atenção crítica: Com esse novo compromisso, faltarão R$ ${Math.abs(saldoLivreSimulado).toFixed(2)} na sua conta no mês que vem!` };
+            semaforo = { status: 'DANGER', titulo: '🔴 Alerta Vermelho: Déficit Projetado!', desc: `Atenção crítica: Na média, faltarão R$ ${Math.abs(saldoLivreSimulado).toFixed(2)} na sua conta por mês durante esse período!` };
         } else if ((saldoLivreSimulado / totalReceitaSimulada) < 0.15) {
-            semaforo = { status: 'WARNING', titulo: '🟡 Margem Aperada / Atenção', desc: `Seu saldo livre cairá para apenas ${(saldoLivreSimulado / totalReceitaSimulada * 100).toFixed(1)}% da sua renda. Evite novos gastos imprevistos!` };
+            semaforo = { status: 'WARNING', titulo: '🟡 Margem Apertada / Atenção', desc: `Seu saldo livre cairá para apenas ${(saldoLivreSimulado / totalReceitaSimulada * 100).toFixed(1)}% da sua renda média.` };
         }
 
-        // 5. Projeção Comparativa Mês a Mês (Próximos 12 Meses)
         const projMeses = [];
         const projBaseData = [];
         const projSimData = [];
@@ -532,19 +536,35 @@ export const calcEngine = {
             const mesTarget = this.getOffsetMonth(curMonth, i);
             projMeses.push(this.formatMesNome(mesTarget));
 
-            // Calcula gastos já contratados naquele mês target
-            let gastosMesTarget = gastosFixosEsperados + varEstimado;
+            let recMesTarget = rendimentoEst;
+            stateData.receitas.forEach(r => {
+                const nomeLower = (r.desc || '').toLowerCase();
+                if (nomeLower.includes('va') || nomeLower.includes('vr') || nomeLower.includes('vale')) return;
+                if (r.fixo) recMesTarget += r.valor;
+            });
+
+            let gastosMesTarget = varEstimado;
             stateData.despesas.forEach(d => {
+                const rateio = d.rateio || (d.dono ? { [d.dono]: 100 } : { 'meu': 100 });
+                const pctMeu = (rateio['meu'] || 0) / 100;
+                if (pctMeu === 0) return;
+
+                const isParcelado = d.tipo === 'Parcelado' && d.parcelas > 1;
+                const isFixo = !isParcelado && (d.natureza === 'fixo_absoluto' || d.natureza === 'fixo_variavel' || d.natureza === 'Fixo');
                 const inc = this.getIncidenciaDespesaNoMes(d, mesTarget);
-                if (inc && inc.ativa && d.tipo === 'Parcelado' && (d.natureza || 'Variável') !== 'Fixo') {
-                    gastosMesTarget += inc.valor;
+                
+                if (inc && inc.ativa) {
+                    if (isFixo || (d.tipo === 'Parcelado' && d.parcelas > 1)) {
+                        gastosMesTarget += inc.valor * pctMeu;
+                    }
+                } else if (!inc && isFixo) {
+                    gastosMesTarget += (d.valorParcela || d.valorTotal) * pctMeu;
                 }
             });
 
-            const sobraMesBase = totalReceitaEsperada - gastosMesTarget;
+            const sobraMesBase = recMesTarget - gastosMesTarget;
             projBaseData.push(parseFloat(sobraMesBase.toFixed(2)));
 
-            // Se a simulação estiver ativa naquele mês target
             let sobraMesSim = sobraMesBase;
             if (i <= simMeses) {
                 if (simTipo === 'despesa') sobraMesSim -= simValor;
@@ -554,7 +574,7 @@ export const calcEngine = {
         }
 
         return {
-            nextMonthNome: this.formatMesNome(nextMonth),
+            nextMonthNome: `MÉDIA DOS PRÓXIMOS ${simMeses} MESES`,
             receitaEsperada: totalReceitaEsperada,
             gastosFixos: gastosFixosEsperados,
             parcelasAtivas: parcelasAtivasEsperadas,
@@ -570,7 +590,7 @@ export const calcEngine = {
             pctComprometidoSimulado,
 
             semaforo,
-            donosResumo,
+            donosResumo: { 'meu': totalGastosBase },
             projecaoChart: {
                 labels: projMeses,
                 baseData: projBaseData,

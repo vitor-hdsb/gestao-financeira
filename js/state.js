@@ -4,12 +4,14 @@
  * V2: Suporte a Contas Correntes, Receitas/Entradas e classificação Fixo vs Variável.
  */
 
+import { db, doc, setDoc, getDoc, auth } from './firebase.js';
+
 const STORAGE_KEY = 'NEXUS_FINANCE_DATA_V1';
 
 // Estado inicial padrão (vazio)
 const defaultState = {
     config: {
-        mesAtual: new Date().toISOString().slice(0, 7), // ex: '2026-07'
+        mesAtual: new Date().toISOString().slice(0, 7),
         simTaxa: 0.85,
         simTaxaTipo: 'am',
         simAporte: 1500
@@ -31,35 +33,60 @@ const defaultState = {
 
 class StateManager {
     constructor() {
-        this.data = this.loadFromStorage();
+        this.data = JSON.parse(JSON.stringify(defaultState));
         this.listeners = [];
+        this.userId = null;
     }
 
-    loadFromStorage() {
+    async init(userId) {
+        this.userId = userId;
+        await this.loadFromCloud();
+    }
+
+    async loadFromCloud() {
+        if (!this.userId || !db) return;
         try {
-            const saved = localStorage.getItem(STORAGE_KEY);
-            if (saved) {
-                const parsed = JSON.parse(saved);
+            const docRef = doc(db, 'users', this.userId);
+            const docSnap = await getDoc(docRef);
+            if (docSnap.exists()) {
+                const parsed = docSnap.data();
                 if (parsed.despesas) {
                     parsed.despesas.forEach(d => {
                         if (d.natureza === undefined) d.natureza = d.fixo ? 'fixo_absoluto' : 'variavel';
                         if (d.valoresMensais === undefined) d.valoresMensais = {};
+                        if (d.cat) {
+                            try { d.cat = decodeURIComponent(escape(d.cat)); } catch(e) {}
+                        }
+                        if (d.parcelas > 1 && d.tipo === 'Fixo') d.tipo = 'Parcelado';
                     });
                 }
-                return { ...defaultState, ...parsed };
+                this.data = { ...defaultState, ...parsed };
+            } else {
+                // Se não existir, tenta carregar o localStorage antigo pra migrar
+                const saved = localStorage.getItem(STORAGE_KEY);
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    this.data = { ...defaultState, ...parsed };
+                    this.save(); // Já salva na nuvem
+                }
             }
         } catch (e) {
-            console.error('Erro ao ler localStorage:', e);
+            console.error('Erro ao ler do Firestore:', e);
         }
-        return JSON.parse(JSON.stringify(defaultState));
+        this.notifyListeners();
     }
 
     save() {
         try {
+            // Backup local
             localStorage.setItem(STORAGE_KEY, JSON.stringify(this.data));
+            // Nuvem
+            if (this.userId && db) {
+                setDoc(doc(db, 'users', this.userId), this.data).catch(e => console.error('Erro Firestore:', e));
+            }
             this.notifyListeners();
         } catch (e) {
-            console.error('Erro ao salvar no localStorage:', e);
+            console.error('Erro ao salvar:', e);
         }
     }
 
@@ -453,20 +480,13 @@ class StateManager {
     // Bulk import transactions from CSV
     addTransactionsFromImport(transactions) {
         transactions.forEach(tx => {
+            if (tx.action === 'ignore') return;
+
             const isReceita = tx.type === 'credito';
             
-            // Check for duplicates
-            const exists = isReceita ? 
-                this.data.receitas.find(r => r.data === tx.date && r.desc === tx.description && r.valor === tx.amount) :
-                this.data.despesas.find(d => d.data === tx.date && d.desc === tx.description && d.valorTotal === Math.abs(tx.amount));
-                
-            if (exists) {
-                const replace = confirm(`Transação duplicada encontrada:\n${tx.description} em ${tx.date} R$${tx.amount}\nClique OK para substituir, Cancelar para pular.`);
-                if (!replace) return; // skip
-                else {
-                    if (isReceita) this.deleteReceita(exists.id);
-                    else this.deleteCompra(exists.id);
-                }
+            if (tx.action === 'replace' && tx.conflictId) {
+                if (isReceita) this.deleteReceita(tx.conflictId);
+                else this.deleteCompra(tx.conflictId);
             }
             
             if (isReceita) {

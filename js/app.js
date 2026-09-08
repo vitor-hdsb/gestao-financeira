@@ -9,10 +9,55 @@ import { calcEngine } from './calculations.js';
 import { tableRenderer } from './components/tables.js';
 import { chartRenderer } from './components/charts.js';
 import { importCsv } from './importCsv.js';
+import { auth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from './firebase.js';
 
 class NexusApp {
     constructor() {
-        this.init();
+        this.setupAuth();
+    }
+
+    setupAuth() {
+        const overlay = document.getElementById('auth-overlay');
+        const emailInput = document.getElementById('auth-email');
+        const passInput = document.getElementById('auth-password');
+        const btnLogin = document.getElementById('auth-login-btn');
+        const errorDiv = document.getElementById('auth-error');
+
+        if (!auth) {
+            // Se o Firebase não estiver configurado nas chaves, inicializa local pra não quebrar
+            overlay.style.display = 'none';
+            this.init();
+            return;
+        }
+
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                overlay.style.display = 'none';
+                await state.init(user.uid); // Baixa os dados do usuário da nuvem
+                this.init(); // Inicializa o app normal
+            } else {
+                overlay.style.display = 'flex';
+            }
+        });
+
+        btnLogin.addEventListener('click', () => {
+            const email = emailInput.value;
+            const pass = passInput.value;
+            if(!email || !pass) return;
+            
+            btnLogin.innerText = "Carregando...";
+            signInWithEmailAndPassword(auth, email, pass)
+                .catch(err => {
+                    errorDiv.style.display = 'block';
+                    errorDiv.innerText = "Erro: Usuário não encontrado ou senha inválida";
+                    btnLogin.innerText = "Entrar / Cadastrar";
+                });
+        });
+
+        document.getElementById('btn-logout')?.addEventListener('click', (e) => {
+            e.preventDefault();
+            signOut(auth).then(() => { window.location.reload(); });
+        });
     }
 
     init() {
@@ -146,16 +191,25 @@ class NexusApp {
                     // Para Conta Corrente, valores negativos = Gastos (debito), positivos = Ganhos (credito)
                     type = t.rawAmount < 0 ? 'debito' : 'credito';
                 }
+                
+                const absAmount = Math.abs(t.rawAmount);
+                const isReceita = type === 'credito';
+                const exists = isReceita ? 
+                    state.data.receitas.find(r => r.data === t.date && Math.abs(r.valor - absAmount) < 0.01) :
+                    state.data.despesas.find(d => d.data === t.date && Math.abs(d.valorTotal - absAmount) < 0.01);
 
                 return {
                     ...t,
                     idx,
-                    amount: Math.abs(t.rawAmount),
+                    amount: absAmount,
                     type,
                     period,
                     accountId,
                     natureza: type === 'debito' ? 'Variável' : null,
-                    dono: 'meu'
+                    dono: 'meu',
+                    conflictId: exists ? exists.id : null,
+                    conflictDesc: exists ? exists.desc : null,
+                    action: exists ? 'ignore' : 'new'
                 };
             });
             
@@ -307,6 +361,20 @@ class NexusApp {
             }
             const rateioStr = parts.join(' | ');
 
+            let actionHtml = `<span class="badge badge-success" style="font-size:11px;"><i data-lucide="check"></i> Nova</span>`;
+            if (item.conflictId) {
+                actionHtml = `
+                    <div style="display:flex; flex-direction:column; gap:4px;">
+                        <span class="amber-text" style="font-size:11px; font-weight:600;"><i data-lucide="alert-triangle"></i> Duplicada: ${item.conflictDesc}</span>
+                        <select class="form-select-sm" onchange="window.__tempEnrichedCsv[${item.idx}].action = this.value" style="width:100%; font-size:11px; padding:2px;">
+                            <option value="ignore" ${item.action === 'ignore' ? 'selected' : ''}>Ignorar CSV (Manter Manual)</option>
+                            <option value="replace" ${item.action === 'replace' ? 'selected' : ''}>Substituir pelo CSV</option>
+                            <option value="new" ${item.action === 'new' ? 'selected' : ''}>Manter Ambas (Nova)</option>
+                        </select>
+                    </div>
+                `;
+            }
+
             return `
                 <tr>
                     <td>${item.date}</td>
@@ -314,15 +382,28 @@ class NexusApp {
                     <td class="${item.type === 'credito' ? 'text-success' : 'rose-text'}">
                         ${item.type === 'credito' ? '+' : '-'} R$ ${item.amount.toFixed(2).replace('.', ',')}
                     </td>
+                    <td>${actionHtml}</td>
                     <td>
                         <div style="display:flex; flex-direction:column; gap:5px;">
                             <button type="button" class="btn btn-outline btn-sm" onclick="app.openRateioModal(${item.idx})" ${disabled}><i data-lucide="percent"></i> Configurar</button>
                             <span id="csv-rateio-badge-${item.idx}" class="badge badge-info" style="font-size: 11px;">${rateioStr}</span>
                         </div>
                     </td>
+                    <td style="text-align:center; vertical-align:middle;">
+                        <button type="button" class="btn btn-outline btn-sm rose-text" onclick="app.removeCsvItem(${item.idx})" title="Excluir Transação">
+                            <i data-lucide="trash-2"></i>
+                        </button>
+                    </td>
                 </tr>
             `;
         }).join('');
+        if (window.lucide) window.lucide.createIcons();
+    }
+
+    removeCsvItem(idx) {
+        if (!window.__tempEnrichedCsv) return;
+        window.__tempEnrichedCsv = window.__tempEnrichedCsv.filter(item => item.idx !== idx);
+        this.renderImportReviewTable();
     }
 
     switchTab(tabId) {
@@ -481,6 +562,8 @@ class NexusApp {
         const mesAtual = data.config.mesAtual;
         const monthSelect = document.getElementById('global-month-select');
         if (monthSelect && monthSelect.value !== mesAtual) monthSelect.value = mesAtual;
+
+        this.populateCategorias();
 
         const despRes = calcEngine.filtrarDespesas(data.despesas, mesAtual, 'ALL', 'ALL', 'ALL');
         const recRes = calcEngine.filtrarReceitas(data.receitas, mesAtual, 'ALL');
@@ -666,10 +749,10 @@ class NexusApp {
             if (badge) badge.textContent = `STATUS: ${prev.semaforo.status === 'SUCCESS' ? 'SAUDÁVEL' : (prev.semaforo.status === 'WARNING' ? 'ATENÇÃO' : 'CRÍTICO')}`;
         }
 
-        // Atualizar Textos de Comparação do Mês Seguinte
-        document.getElementById('prev-mes-nome')?.setAttribute('title', `Mês Seguinte: ${prev.nextMonthNome}`);
+        // Atualizar Textos de Comparação
+        document.getElementById('prev-mes-nome')?.setAttribute('title', prev.nextMonthNome);
         const mesNomeEl = document.getElementById('prev-mes-nome');
-        if (mesNomeEl) mesNomeEl.textContent = `MÊS QUE VEM (${prev.nextMonthNome})`;
+        if (mesNomeEl) mesNomeEl.textContent = prev.nextMonthNome;
 
         const recEl = document.getElementById('prev-rec-val');
         if (recEl) recEl.textContent = tableRenderer.formatCurrency(prev.receitaEsperada);
@@ -872,13 +955,7 @@ class NexusApp {
         const cartaoId = document.getElementById('modal-compra-cartao').value;
         const cat = document.getElementById('modal-compra-cat').value;
         const natureza = document.getElementById('modal-compra-natureza').value;
-        
-        let tipo = 'A vista';
-        if (natureza === 'fixo_absoluto' || natureza === 'fixo_variavel') {
-            tipo = 'Fixo';
-        } else {
-            tipo = document.getElementById('modal-compra-tipo').value === 'Parcelado' ? 'Parcelado' : 'A vista';
-        }
+        const tipo = document.getElementById('modal-compra-tipo').value === 'Parcelado' ? 'Parcelado' : 'A vista';
         
         const rateio = window.__currentRateio || { 'meu': 100 };
         const parcelas = parseInt(document.getElementById('modal-compra-parcelas').value) || 1;
@@ -1053,6 +1130,24 @@ class NexusApp {
             if (type === 'VA') state.updateBeneficiosConfig({ vaCarga: val });
             else state.updateBeneficiosConfig({ vrCarga: val });
         }
+    }
+
+    populateCategorias() {
+        const select = document.getElementById('filter-categoria');
+        if (!select) return;
+
+        const cats = new Set(state.data.despesas.map(d => d.cat || 'Outros'));
+        const catArray = Array.from(cats).sort();
+
+        const currentActive = select.value || 'ALL';
+
+        let html = `<option value="ALL">Todas as Categorias</option>`;
+        catArray.forEach(c => {
+            html += `<option value="${c}">${c}</option>`;
+        });
+
+        select.innerHTML = html;
+        select.value = currentActive;
     }
 }
 

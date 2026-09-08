@@ -13,6 +13,22 @@
     <link rel="stylesheet" href="index.css">
 </head>
 <body class="dark-theme">
+    <div id="auth-overlay" class="modal-overlay" style="display:flex; z-index:9999; background: var(--bg-dark); align-items:center; justify-content:center; position:fixed; top:0; left:0; width:100%; height:100%;">
+        <div class="modal-card glass" style="max-width: 400px; text-align: center;">
+            <div class="logo-section" style="justify-content:center; margin-bottom: 20px;">
+                <div class="logo-icon"><i data-lucide="compass"></i></div>
+                <div class="logo-text">
+                    <h1>Nexus<span>Finance</span> <span class="badge-pro">PRO</span></h1>
+                </div>
+            </div>
+            <h3 style="margin-bottom:20px;">Login</h3>
+            <input type="email" id="auth-email" class="form-input" placeholder="E-mail" style="margin-bottom:15px; text-align:center;">
+            <input type="password" id="auth-password" class="form-input" placeholder="Senha" style="margin-bottom:20px; text-align:center;">
+            <button id="auth-login-btn" class="btn btn-primary" style="width:100%; justify-content:center;">Entrar / Cadastrar</button>
+            <div id="auth-error" class="rose-text" style="margin-top:15px; font-size:12px; display:none;">Erro de login</div>
+        </div>
+    </div>
+
     <div class="bg-glow glow-1"></div>
     <div class="bg-glow glow-2"></div>
     <div class="bg-glow glow-3"></div>
@@ -46,6 +62,8 @@
                         <a href="#" id="export-json"><i data-lucide="download"></i> Backup (JSON)</a>
                         <a href="#" id="import-json"><i data-lucide="upload"></i> Restaurar (JSON)</a>
                         <a href="#" id="export-csv"><i data-lucide="file-down"></i> Relatório CSV</a>
+                        <div style="border-top: 1px solid rgba(255,255,255,0.1); margin: 5px 0;"></div>
+                        <a href="#" id="btn-logout" class="rose-text"><i data-lucide="log-out"></i> Sair da Conta</a>
                         <div class="divider"></div>
                         <a href="#" id="reset-data" class="text-danger"><i data-lucide="trash"></i> Limpar Dados</a>
                     </div>
@@ -299,7 +317,7 @@
                                 <input type="text" id="filter-search" placeholder="Buscar despesa...">
                             </div>
                             <select id="filter-cartao" class="form-select-sm"><option value="ALL">Todas as Origens</option></select>
-                            <select id="filter-categoria" class="form-select-sm"><option value="ALL">Categorias</option></select>
+                            <select id="filter-categoria" class="form-select-sm"><option value="ALL">Todas as Categorias</option></select>
                             <select id="filter-natureza" class="form-select-sm"><option value="ALL">Natureza</option><option value="fixo_absoluto">Fixo Absoluto</option><option value="fixo_variavel">Fixo Variável</option><option value="variavel">Variável</option></select>
                         </div>
                         <div class="toolbar-right">
@@ -511,19 +529,21 @@
     
     <!-- MODAL CSV REVIEW -->
     <div id="modal-import-review" class="modal-overlay">
-        <div class="modal-card glass" style="max-width:800px;">
+        <div class="modal-card glass" style="max-width:95vw; height:95vh; display:flex; flex-direction:column;">
             <div class="modal-header">
                 <h3><i data-lucide="users"></i> Revisão e Divisão de Custos</h3>
                 <button class="btn-close" onclick="app.closeModal('modal-import-review')"><i data-lucide="x"></i></button>
             </div>
-            <div class="table-responsive" style="max-height:400px;">
+            <div class="table-responsive" style="flex: 1; overflow-y: auto; overflow-x: auto;">
                 <table class="data-table">
                     <thead>
                         <tr>
                             <th>Data</th>
                             <th>Descrição</th>
                             <th>Valor</th>
+                            <th>Ação / Status</th>
                             <th>Dono (Rateio)</th>
+                            <th style="width: 50px;"></th>
                         </tr>
                     </thead>
                     <tbody id="tbody-import-review"></tbody>
