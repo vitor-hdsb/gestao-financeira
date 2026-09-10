@@ -55,6 +55,31 @@ class NexusApp {
                 });
         });
 
+        document.getElementById('auth-recover-btn')?.addEventListener('click', () => {
+            const email = emailInput.value;
+            const pass = passInput.value;
+            if(!email || !pass) {
+                alert("Digite seu email e senha primeiro para forçar a migração.");
+                return;
+            }
+            const localData = localStorage.getItem('NEXUS_FINANCE_DATA_V1');
+            if(!localData || localData.length < 50) {
+                alert("Não encontrei dados salvos no navegador deste computador. Tem certeza que usava por aqui?");
+                return;
+            }
+            if(confirm("Isso vai SUBSTITUIR os dados da nuvem pelos dados salvos no SEU computador agora. Tem certeza?")) {
+                document.getElementById('auth-recover-btn').innerText = "Migrando...";
+                signInWithEmailAndPassword(auth, email, pass).then((cred) => {
+                    import('./firebase.js').then(({ doc, setDoc, db }) => {
+                        setDoc(doc(db, 'users', cred.user.uid), JSON.parse(localData)).then(() => {
+                            alert("Migração concluída! O Vercel agora tem seus dados.");
+                            window.location.reload();
+                        });
+                    });
+                }).catch(err => alert("Erro ao fazer login: " + err.message));
+            }
+        });
+
         document.getElementById('btn-logout')?.addEventListener('click', (e) => {
             e.preventDefault();
             signOut(auth).then(() => { window.location.reload(); });
